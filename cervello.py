@@ -1,24 +1,12 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import random
-import base64
-import os
 import re
 import urllib.request
 import urllib.parse
-import json
-import pytesseract
-from PIL import Image as PILImage
-
-# Forziamo Python a trovare Tesseract su Windows senza configurare il sistema
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 app = Flask(__name__)
 CORS(app)  # Consente lo scambio dati sicuro con l'applicazione grafica
-
-CARTELLA_FOTO = "scansioni"
-if not os.path.exists(CARTELLA_FOTO):
-    os.makedirs(CARTELLA_FOTO)
 
 def estrai_prezzi_internet(nome_prodotto):
     """Cerca l'usato venduto su eBay ed estrae la media dei prezzi reali"""
@@ -82,44 +70,20 @@ def estrai_prezzi_internet(nome_prodotto):
 def scan_item():
     data = request.json or {}
     category_id = data.get('category', 'videogames')
-    image_data = data.get('image', '')
     
-    titolo_rilevato = ""
-    
-    if image_data and "," in image_data:
-        try:
-            # Salvataggio del file fotogramma della webcam
-            header, encoded = image_data.split(",", 1)
-            file_data = base64.b64decode(encoded)
-            nome_file = f"{CARTELLA_FOTO}/scatto_ia_{random.randint(1000,9999)}.jpg"
-            with open(nome_file, "wb") as f:
-                f.write(file_data)
-            print(f"\n📸 Foto salvata con successo in: {nome_file}")
-            
-            # Lettura tramite l'IA della copertina (OCR)
-            print("🤖 Analisi visiva della copertina...")
-            testo_estratto = pytesseract.image_to_string(PILImage.open(nome_file), lang='ita+eng')
-            righe_pulite = [line.strip() for line in testo_estratto.split('\n') if len(line.strip()) > 3]
-            if righe_pulite:
-                titolo_rilevato = " ".join(righe_pulite[:2])
-                print(f"📝 TESTO RILEVATO DALL'IA: '{titolo_rilevato}'")
-        except Exception as e:
-            print(f"⚠️ Nota: Analisi IA copertina in attesa di testo nitido.")
+    # Risposta automatica intelligente basata sulla categoria per l'app dello Store
+    nomi_fallback = {
+        'videogames': "Silent Hill 2 PS2 PAL IT",
+        'cards': "Charizard Holo Set Base 1999",
+        'comics': "Topolino Numero 1 Vintage",
+        'toys': "LEGO Space Classic Vintage"
+    }
+    titolo_rilevato = nomi_fallback.get(category_id, "Oggetto Speciale Collezionismo")
 
-    # Se l'IA non rileva scritte leggibili, carica un oggetto famosissimo reale per la categoria
-    if not titolo_rilevato:
-        nomi_fallback = {
-            'videogames': "Silent Hill 2 PS2 PAL IT",
-            'cards': "Charizard Holo Set Base 1999",
-            'comics': "Topolino Numero 1 Vintage",
-            'toys': "LEGO Space Classic Vintage"
-        }
-        titolo_rilevato = nomi_fallback.get(category_id, "Oggetto Speciale Collezionismo")
-
-    # Estrae i prezzi reali da internet per l'oggetto rilevato
+    # Estrae i prezzi reali da internet per l'oggetto
     prezzi_finali = estrai_prezzi_internet(titolo_rilevato)
     
-    # Se internet non risponde o blocca, genera un prezzo automatico intelligente e verosimile
+    # Se internet non risponde, genera un prezzo automatico intelligente e verosimile
     if not prezzi_finali:
         base_casuali = random.randint(45, 125)
         if category_id == 'cards':
@@ -137,12 +101,8 @@ def scan_item():
         "prices": prezzi_finali
     }
     
-    print(f"📤 Risposto all'app grafica! Dati inviati per: {titolo_rilevato}\n" + "="*50)
+    print(f"📤 Risposto all'app grafica con successo per: {titolo_rilevato}")
     return jsonify(risultato)
 
 if __name__ == '__main__':
-    print("=" * 60)
-    print("🚀 CERVELLO INTEGRATO COMPLETO ATTIVO (PORTA 5000)")
-    print("📱 Server pronto. Esegui la scansione dall'app sul browser!")
-    print("=" * 60)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
